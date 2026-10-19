@@ -69,13 +69,29 @@ workflows exactly).
 | order | 17.72 s | 0.26 s | 0.14 s |
 | fast4 (4 steps) | 2.32 s | 0.037 s | 0.032 s |
 
-## 5. Tests
+## 5. Clean install
+
+A fresh ComfyUI v0.42.1 checkout and a fresh Python 3.12 environment (PyTorch 2.14.1+cu130 and ComfyUI's requirements), then
+`git clone` of this repository into `custom_nodes`, `pip install -r requirements.txt` (adds antalia-mini 1.0.1 with cmudict,
+soundfile and their small helpers), and `tools/download_model.py --models-dir models/antalia`: 8 of 8 files downloaded at the
+pinned revision and verified. The GPU real-queue check of section 3 against that installation (`--base-dir` = the ComfyUI folder)
+passed with the same results; the cloned working tree was unchanged afterwards.
+
+The Registry package (`comfy node validate` and `comfy node pack`, comfy-cli 1.22.0, on the committed tree): validation passed;
+the archive holds the 18 files of the node (no tests, scripts or weights) and none of the scanned patterns (environment, network
+or process code, absolute paths, tokens).
+
+## 6. Tests and CI
 
 `tests/` (32 tests) on the CPU with ComfyUI v0.42.1 and the real model, every reference required: the pack against the official
 API in the same process (six argument sets, fp16), seeds, the package's checksum check on changed weights, missing files, the
 pinned package version, the package scan (no environment, network or process code in what ships; the official resolver returns
 a folder without downloading), ComfyUI's validation of every API workflow, the UI workflows against the API ones, node execution
 against the runtime, invalid inputs, and the download tool.
+
+CI (GitHub Actions, CPU, the real model fetched by the download tool) runs the same tests and the real-queue check on four jobs:
+ComfyUI v0.38.0 on Ubuntu and Windows (Python 3.12, PyTorch 2.14.1), ComfyUI v0.38.0 on Ubuntu with Python 3.10 and PyTorch
+2.8.0, and ComfyUI v0.42.1 on Ubuntu; all passed with nothing skipped.
 
 ## Not checked
 
