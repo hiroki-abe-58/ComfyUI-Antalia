@@ -1,0 +1,25 @@
+[project]
+name = "antalia-mini-tts"
+description = "Antalia-2 Mini for ComfyUI: small Turkish text to speech (7.6M parameters, one synthetic voice, 48 kHz, faster than real time on a CPU; Apache-2.0). Raw Turkish text with numbers, dates and English words. Same audio as the official antalia-mini package, bit for bit."
+version = "0.1.0"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = ["antalia-mini==1.0.1"]
+
+[project.urls]
+Repository = "https://github.com/hiroki-abe-58/ComfyUI-Antalia"
+
+[tool.comfy]
+PublisherId = "hiroki-abe-58"
+DisplayName = "Antalia-2 Mini Turkish TTS for ComfyUI"
+Icon = ""
+
+[tool.ruff]
+line-length = 180
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

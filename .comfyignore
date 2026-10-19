@@ -1,0 +1,12 @@
+# Files excluded from a Comfy Registry package (gitignore syntax). The installed node needs the runtime package, workflows,
+# tools/download_model.py, docs and license files; tests and maintainer tools stay in the GitHub repository.
+tests/
+scripts/
+.github/
+docs/images/
+.gitignore
+.gitattributes
+.comfyignore
+__pycache__/
+.ruff_cache/
+.pytest_cache/

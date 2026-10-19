@@ -1,0 +1,5 @@
+{
+  "1": {"class_type": "AntaliaLoader", "inputs": {"model": "antalia-mini", "device": "auto", "variant": "fp32"}},
+  "2": {"class_type": "AntaliaSpeak", "inputs": {"model": ["1", 0], "text": "Siparişiniz yola çıktı. Toplam tutar 249,90 TL. Kargo takip numaranız SMS ile gönderildi.", "seed": 0, "speed": 0.95, "steps": 8, "cfg": 2.0, "sample_rate": "8000", "eq": true}},
+  "3": {"class_type": "SaveAudioAdvanced", "inputs": {"audio": ["2", 0], "filename_prefix": "antalia/phone", "format": "flac"}}
+}

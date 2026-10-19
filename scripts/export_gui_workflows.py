@@ -1,0 +1,121 @@
+"""Load the API workflows into a running ComfyUI frontend, check them, and export the UI-format workflows.
+
+Maintainer tool (needs `playwright` and a Chromium for it; not part of the node pack):
+
+  python scripts/export_gui_workflows.py --url http://127.0.0.1:PORT --shots DIR
+
+For each workflows/api/<name>.json it loads the graph with the frontend's own `app.loadApiJson`, checks that every
+node type is known to the frontend (no "missing nodes") and that `app.graphToPrompt()` gives back the same class
+types, links and widget values, lays the nodes out in columns by their depth in the graph (the frontend stacks API
+workflows on top of each other), loads the result back and saves a screenshot, and writes the frontend's serialized graph to
+workflows/gui/<name>.json with the seed set to "fixed". Nothing is queued.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright
+
+SEEDED = {"AntaliaSpeak"}
+FRONTEND_OWNED = set()
+
+
+def layout(api: dict, ui: dict) -> None:
+    """Columns by depth (inputs to the left), nodes of a column stacked; positions only."""
+    depth: dict = {}
+
+    def visit(nid: str) -> int:
+        if nid not in depth:
+            links = [v[0] for v in api[nid]["inputs"].values() if isinstance(v, list)]
+            depth[nid] = 1 + max((visit(src) for src in links), default=-1)
+        return depth[nid]
+
+    for nid in api:
+        visit(nid)
+    nodes = {str(n["id"]): n for n in ui["nodes"]}
+    x = 40
+    for d in range(max(depth.values()) + 1):
+        column = sorted((nid for nid in api if depth[nid] == d), key=int)
+        y = 40
+        for nid in column:
+            nodes[nid]["pos"] = [x, y]
+            y += nodes[nid]["size"][1] + 80
+        x += max(nodes[nid]["size"][0] for nid in column) + 60
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--url", required=True)
+    ap.add_argument("--api-dir", type=Path, default=Path("workflows/api"))
+    ap.add_argument("--out", type=Path, default=Path("workflows/gui"))
+    ap.add_argument("--shots", type=Path, required=True)
+    args = ap.parse_args()
+    if not args.url.startswith("http://127.0.0.1:"):
+        raise SystemExit("only a local test server")
+    args.shots.mkdir(parents=True, exist_ok=True)
+    args.out.mkdir(parents=True, exist_ok=True)
+    report = {}
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 1680, "height": 1000}, locale="en-US")
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(args.url)
+        page.wait_for_function("() => window.app && window.app.graph && window.LiteGraph", timeout=120000)
+        page.wait_for_timeout(3000)
+        page.keyboard.press("Escape")  # the template browser opens on first start
+        page.wait_for_timeout(500)
+        for api_file in sorted(args.api_dir.glob("*.json")):
+            name = api_file.stem
+            api = json.loads(api_file.read_text(encoding="utf-8"))
+            res = page.evaluate(
+                """async ([api, name]) => {
+                    await window.app.loadApiJson(api, name);
+                    await new Promise(r => setTimeout(r, 1500));
+                    const nodes = window.app.graph._nodes;
+                    const known = Object.keys(window.LiteGraph.registered_node_types);
+                    const missing = nodes.filter(n => !known.includes(n.type)).map(n => n.type);
+                    const { output } = await window.app.graphToPrompt();
+                    const ui = window.app.graph.serialize();
+                    return { count: nodes.length, missing, output, ui };
+                }""",
+                [api, name],
+            )
+            layout(api, res["ui"])
+            page.evaluate("async ([ui, name]) => { await window.app.loadGraphData(ui, true, true, name); }", [res["ui"], name])
+            page.wait_for_timeout(1000)
+            page.evaluate("() => { const c = window.app.canvas; c.ds.scale = 0.75; c.ds.offset = [40, 60]; c.setDirty(true, true); }")
+            page.wait_for_timeout(500)
+            page.screenshot(path=str(args.shots / f"{name}.png"))
+            back = res["output"]
+            mismatch = []
+            for nid, node in api.items():
+                got = back.get(nid)
+                if not got or got["class_type"] != node["class_type"]:
+                    mismatch.append((nid, "class_type"))
+                    continue
+                for k, v in node["inputs"].items():
+                    if k in FRONTEND_OWNED:
+                        continue
+                    if got["inputs"].get(k) != v:
+                        mismatch.append((nid, k, v, got["inputs"].get(k)))
+            report[name] = {"nodes": res["count"], "missing_node_types": res["missing"], "roundtrip_mismatches": mismatch}
+            for node in res["ui"]["nodes"]:
+                if node["type"] in SEEDED:  # reproducible example: keep the seed after each run
+                    node["widgets_values"] = ["fixed" if v == "randomize" else v for v in node["widgets_values"]]
+                    if node.get("widgets_values_named", {}).get("control_after_generate") == "randomize":  # newer frontends keep both
+                        node["widgets_values_named"]["control_after_generate"] = "fixed"
+            (args.out / f"{name}.json").write_text(json.dumps(res["ui"], indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+        report["page_errors"] = errors
+        browser.close()
+    print(json.dumps(report, indent=1, ensure_ascii=False))
+    bad = any(v["missing_node_types"] or v["roundtrip_mismatches"] for k, v in report.items() if k != "page_errors")
+    return 1 if bad else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,17 @@
+Antalia-2 Mini Turkish TTS for ComfyUI
+Copyright (c) 2026 hiroki-abe-58. The code of this node pack is licensed under the MIT License (LICENSE).
+
+This node pack is an unofficial integration. It is not affiliated with or endorsed by PatientDesk AI (the authors of Antalia-2
+Mini) or by Comfy Org.
+
+Dependency (installed by pip, not included here)
+------------------------------------------------
+antalia-mini 1.0.1 (PyPI), Copyright 2026 PatientDesk AI, Apache License 2.0. It uses the CMU Pronouncing Dictionary through the
+`cmudict` package (Copyright Carnegie Mellon University, BSD 2-Clause).
+
+Model (not included)
+--------------------
+No model weights are included or downloaded by the nodes. tools/download_model.py fetches, when you run it:
+- cloud0day3/antalia-mini (Apache-2.0): config.json, the acoustic and vocoder safetensors (fp32 and fp16), LICENSE, NOTICE,
+  README.md. According to its NOTICE, the weights were trained on synthetic speech generated with VoxCPM2 (OpenBMB,
+  Apache-2.0); the voice is synthetic, not a real person's.
